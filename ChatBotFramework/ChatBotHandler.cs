@@ -32,12 +32,13 @@ sealed class ChatBotHandler<UID, MODEL, STYPE> : IChatBotHandler<UID> where MODE
         logger.LogDebug("[{0}] Load model (command={1})", userId, request.Command);
         var model = await modelStorage.Load(userId);
 
-        var handler = request.Command != null
-                          ? commandCollection.GetCommandHandler(serviceProvider, request.Command)
-                          : commandCollection.GetStateHandler(serviceProvider, model.State);
+        var handler = (request.Command != null
+                           ? commandCollection.GetCommandHandler(serviceProvider, request.Command)
+                           : commandCollection.GetStateHandler(serviceProvider, model.State)) ?? commandCollection.GetCommandHandler(serviceProvider, "*");
+        
         if (handler == null)
         {
-            logger.LogDebug("[{0}] Can't find handler for command={1} or state={2}", userId, request.Command, model.State);
+            logger.LogWarning("[{0}] Can't find handler for command={1} or state={2}", userId, request.Command, model.State);
             return ChatBotResponse.Text("Unknown command or state");
         }
 

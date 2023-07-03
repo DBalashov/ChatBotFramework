@@ -17,7 +17,8 @@ sealed class ChatBotTelegramService<MODEL, STYPE> : IHostedService, IUpdateHandl
     readonly string                   logPrefix;
     readonly TimeSpan                 groupedMessageInterval;
 
-    readonly Dictionary<string, GroupedMessage> groupedMessages = new(StringComparer.Ordinal);
+    readonly Dictionary<string, GroupedMessage> groupedMessages     = new(StringComparer.Ordinal);
+    readonly ReaderWriterLockSlim               groupedMessagesLock = new();
 
     public ChatBotTelegramService(ILogger<ChatBotTelegramService<MODEL, STYPE>> logger, ChatBotTelegramOptions options, IChatBotMessageProcessor messageProcessor)
     {
@@ -100,30 +101,34 @@ sealed class ChatBotTelegramService<MODEL, STYPE> : IHostedService, IUpdateHandl
             return;
         }
 
-        lock (groupedMessages)
+        groupedMessagesLock.EnterUpgradeableReadLock();
+        if (!groupedMessages.TryGetValue(mediaGroupId, out var groupedMessage))
         {
-            if (!groupedMessages.TryGetValue(mediaGroupId, out var groupedMessage))
+            groupedMessagesLock.EnterWriteLock();
+            if (!groupedMessages.TryGetValue(mediaGroupId, out groupedMessage))
             {
                 logger.LogDebug("[{0}] media group not found, create one {1}", logContextPrefix, mediaGroupId);
                 groupedMessages.Add(mediaGroupId, groupedMessage = new GroupedMessage(mediaGroupId, groupedMessageInterval, u.ConvertToParams(), logContextPrefix, completeMediaGroup));
             }
-            else
-            {
-                logger.LogDebug("[{0}] media group found {1}", logContextPrefix, mediaGroupId);
-            }
 
-            logger.LogDebug("[<{0}] media group {1}, add file {2}", logContextPrefix, mediaGroupId, fileId);
-            groupedMessage.AddFile(fileId);
+            groupedMessagesLock.ExitWriteLock();
         }
+        else
+        {
+            logger.LogDebug("[{0}] media group found {1}", logContextPrefix, mediaGroupId);
+        }
+
+        groupedMessagesLock.ExitUpgradeableReadLock();
+        logger.LogDebug("[<{0}] media group {1}, add file {2}", logContextPrefix, mediaGroupId, fileId);
+        groupedMessage.AddFile(fileId);
     }
 
     async Task completeMediaGroup(GroupedMessage owner, HandleMessageParams p, string[] fileIDs, string logContextPrefix)
     {
-        lock (groupedMessages)
-        {
-            var existing = groupedMessages.Remove(owner.MediaGroupId);
-            logger.LogDebug("[{0}] media group {1} remove ({2})", logContextPrefix, owner.MediaGroupId, existing);
-        }
+        groupedMessagesLock.EnterWriteLock();
+        var existing = groupedMessages.Remove(owner.MediaGroupId);
+        logger.LogDebug("[{0}] media group {1} remove ({2})", logContextPrefix, owner.MediaGroupId, existing);
+        groupedMessagesLock.ExitWriteLock();
 
         logger.LogDebug("[{0}] media group {1} complete, {2} files", logContextPrefix, owner.MediaGroupId, fileIDs.Length);
 

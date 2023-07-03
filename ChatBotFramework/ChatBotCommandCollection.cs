@@ -1,8 +1,5 @@
 ﻿namespace ChatBotFramework;
 
-record ChatBotCommandWrapper<UID, MODEL>(string Command, Type Handler);
-
-record ChatBotStateWrapper<UID, MODEL, STYPE>(STYPE State, Type Handler);
 
 sealed class ChatBotCommandCollection<UID, MODEL, STYPE> : IChatBotCommandCollection<UID, MODEL, STYPE> where STYPE : notnull
 {
