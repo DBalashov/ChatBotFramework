@@ -1,7 +1,7 @@
 ﻿namespace ChatBotFramework;
 
 /// <summary> scoped service </summary>
-sealed class ChatBotHandler<UID, MODEL, STYPE> : IChatBotHandler<UID> where MODEL : ChatBotModelBase<STYPE>, new()
+sealed class ChatBotHandler<UID, MODEL, STYPE> : IChatBotHandler<UID> where MODEL : IChatBotModel<STYPE>, new()
                                                                       where UID : notnull
                                                                       where STYPE : notnull
 {

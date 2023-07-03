@@ -5,6 +5,18 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <OutputType>Library</OutputType>
+        <AssemblyName>ChatBotFramework.Telegram</AssemblyName>
+        <PackageId>ChatBotFramework.Telegram</PackageId>
+        <GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+        <Version>2023.7.1.0</Version>
+        <AssemblyVersion>$(Version)</AssemblyVersion>
+        <FileVersion>$(Version)</FileVersion>
+        <Description>Framework for create chat bots (with Telegram). MIT License</Description>
+        <Authors>Denis Balashov and contributors</Authors>
+        <RepositoryUrl>https://github.com/DBalashov/ChatBotFramework</RepositoryUrl>
+        <Copyright>Denis Balashov © 2023, dbalashov@gmail.com</Copyright>
+        <PackageTags>C#,chatbot,chatbotframework,telegram</PackageTags>
+        <IsPackable>true</IsPackable>
     </PropertyGroup>
 
     <ItemGroup>

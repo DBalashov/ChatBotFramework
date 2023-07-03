@@ -23,7 +23,7 @@ sealed class ChatBotMessageProcessor : IChatBotMessageProcessor
         var messageText = p.MessageText ?? "";
 
         logger.LogDebug("[<{0}] {1} {2} (files[{3}]={4})",
-                        p.MessageType, p.RequestId, messageText, p.Files.Length, string.Join(',', p.Files.Select(f => f.FileName + "(" + f.Content.Length + " bytes)")));
+                        p.LogPrefix, p.RequestId, messageText, p.Files.Length, string.Join(',', p.Files.Select(f => f.FileName + "(" + f.Content.Length + " bytes)")));
 
         using var scope = serviceScopeFactory.CreateScope();
         try
@@ -37,7 +37,7 @@ sealed class ChatBotMessageProcessor : IChatBotMessageProcessor
         }
         catch (Exception e)
         {
-            logger.LogWarning("[<{0}] {1} Can't process: {2}", p.MessageType, p.RequestId, (e.InnerException ?? e).Message);
+            logger.LogWarning("[<{0}] {1} Can't process: {2}", p.LogPrefix, p.RequestId, (e.InnerException ?? e).Message);
             await processFail(bot, p);
         }
     }
@@ -68,8 +68,7 @@ sealed class ChatBotMessageProcessor : IChatBotMessageProcessor
             switch (respItem)
             {
                 case ChatBotMessage msg:
-                {
-                    logger.LogDebug("[>{0}] {1}{2}", p.MessageType, msg.Message, buttons);
+                    logger.LogDebug("[>{0}] {1}{2}", p.LogPrefix, msg.Message, buttons);
                     try
                     {
                         var messageOut = await bot.SendTextMessageAsync(p.Chat, msg.Message, parseMode: msg.GetParseMode(), replyMarkup: replyMarkup, replyToMessageId: replyToMessageId);
@@ -83,12 +82,10 @@ sealed class ChatBotMessageProcessor : IChatBotMessageProcessor
                     }
 
                     break;
-                }
 
                 case ChatBotFile:
                 case ChatBotFileUrl:
-                {
-                    logger.LogDebug("[>{0}] {1} {2}{3}", p.MessageType, p.RequestId, "File", buttons);
+                    logger.LogDebug("[>{0}] {1} {2}{3}", p.LogPrefix, p.RequestId, "File", buttons);
                     var documents = respItem.ConvertToDocument();
                     try
                     {
@@ -101,29 +98,23 @@ sealed class ChatBotMessageProcessor : IChatBotMessageProcessor
                         var messageOut = await bot.SendDocumentAsync(p.Chat, documents, replyMarkup: replyMarkup);
                         messageIDs.Add(messageOut.MessageId);
                     }
-
                     break;
-                }
 
                 case ChatBotImage:
                 case ChatBotImageUrl:
                 case ChatBotVideo:
                 case ChatBotVideoUrl:
-                {
                     images.Add(respItem.ConvertToMedia());
                     break;
-                }
                 default:
-                {
-                    logger.LogWarning("[>{0}] {1} Unknown message type: {2}", p.MessageType, p.RequestId, respItem.GetType().Name);
+                    logger.LogWarning("[>{0}] {1} Unknown message type: {2}", p.LogPrefix, p.RequestId, respItem.GetType().Name);
                     break;
-                }
             }
         }
 
         if (images.Any())
         {
-            logger.LogDebug("[>{0}] {1} {2} ({3} images)", p.MessageType, p.RequestId, "Images", images.Count);
+            logger.LogDebug("[>{0}] {1} {2} ({3} images)", p.LogPrefix, p.RequestId, "Images", images.Count);
             foreach (var chunk in images.Chunk(MEDIA_CHUNK_SIZE))
                 try
                 {
@@ -138,7 +129,7 @@ sealed class ChatBotMessageProcessor : IChatBotMessageProcessor
                 }
         }
 
-        logger.LogDebug("[>{0}] {1} Message IDs: {2}", p.MessageType, p.RequestId, string.Join(',', messageIDs));
+        logger.LogDebug("[>{0}] {1} Message IDs: {2}", p.LogPrefix, p.RequestId, string.Join(',', messageIDs));
     }
 
     #endregion

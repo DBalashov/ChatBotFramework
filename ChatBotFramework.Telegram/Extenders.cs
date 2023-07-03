@@ -85,7 +85,7 @@ static class TelegramExtenders
         }
         catch (Exception e)
         {
-            logger.LogWarning("[{0}] Can't download file {1}: {2}", logContextPrefix, fileId, (e.InnerException ?? e).Message);
+            logger.LogWarning("[<{0}] Can't download file {1}: {2}", logContextPrefix, fileId, (e.InnerException ?? e).Message);
             return null;
         }
     }

@@ -8,7 +8,7 @@ using Telegram.Bot.Types.Enums;
 
 namespace ChatBotFramework.Telegram;
 
-sealed class ChatBotTelegramService<MODEL, STYPE> : IHostedService, IUpdateHandler where MODEL : ChatBotModelBase<STYPE>
+sealed class ChatBotTelegramService<MODEL, STYPE> : IHostedService, IUpdateHandler where MODEL : IChatBotModel<STYPE>
                                                                                    where STYPE : notnull
 {
     readonly ILogger                  logger;
