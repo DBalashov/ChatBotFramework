@@ -1,23 +1,24 @@
-﻿using System.Text.Json;
-
-namespace ChatBotFramework;
+﻿namespace ChatBotFramework;
 
 /// <summary> scoped service </summary>
 sealed class ChatBotHandler<UID, MODEL, STYPE> : IChatBotHandler<UID> where MODEL : ChatBotModelBase<STYPE>, new()
                                                                       where UID : notnull
                                                                       where STYPE : notnull
 {
-    readonly ILogger                                 logger;
-    readonly IChatBotModelStorage<UID, MODEL, STYPE> modelStorage;
-    readonly IServiceProvider                        serviceProvider;
+    readonly ILogger                                      logger;
+    readonly IChatBotModelStorage<UID, MODEL, STYPE>      modelStorage;
+    readonly IServiceProvider                             serviceProvider;
+    readonly IChatBotCommandCollection<UID, MODEL, STYPE> commandCollection;
 
-    public ChatBotHandler(ILogger<ChatBotHandler<UID, MODEL, STYPE>> logger,
-                          IChatBotModelStorage<UID, MODEL, STYPE>    modelStorage,
-                          IServiceProvider                           serviceProvider)
+    public ChatBotHandler(ILogger<ChatBotHandler<UID, MODEL, STYPE>>   logger,
+                          IChatBotModelStorage<UID, MODEL, STYPE>      modelStorage,
+                          IServiceProvider                             serviceProvider,
+                          IChatBotCommandCollection<UID, MODEL, STYPE> commandCollection)
     {
-        this.logger          = logger;
-        this.modelStorage    = modelStorage;
-        this.serviceProvider = serviceProvider;
+        this.logger            = logger;
+        this.modelStorage      = modelStorage;
+        this.serviceProvider   = serviceProvider;
+        this.commandCollection = commandCollection;
     }
 
     #region Handle
@@ -28,15 +29,25 @@ sealed class ChatBotHandler<UID, MODEL, STYPE> : IChatBotHandler<UID> where MODE
         if (historyLogger != null)
             await historyLogger.Log(new ChatBotHistoryItem<UID>(userId, ChatBotHistoryAction.User, DateTime.UtcNow, request.OriginalMessage));
 
-        var handler = serviceProvider.GetRequiredService<IChatBotModelHandler<UID, MODEL, STYPE>>();
-        logger.LogDebug("[{0}{1}] Load model", userId, request.Command == null ? "" : $"/{request.Command}");
+        logger.LogDebug("[{0}] Load model (command={1})", userId, request.Command);
         var model = await modelStorage.Load(userId);
 
-        var response = await handler.InvokeHandler(userId, model, request);
-        if (!model.Modified) return response;
+        var handler = request.Command != null
+                          ? commandCollection.GetCommandHandler(serviceProvider, request.Command)
+                          : commandCollection.GetStateHandler(serviceProvider, model.State);
+        if (handler == null)
+        {
+            logger.LogDebug("[{0}] Can't find handler for command={1} or state={2}", userId, request.Command, model.State);
+            return ChatBotResponse.Text("Unknown command or state");
+        }
 
-        logger.LogDebug("[{0}{1}] Model changed, save", userId, request.Command == null ? "" : $"/{request.Command}");
-        await modelStorage.Save(userId, model);
+        var response = await handler.Handle(userId, model, request);
+        if (model.Modified)
+        {
+            model.Modified = false;
+            logger.LogDebug("[{0}{1}] Model changed, save", userId, request.Command == null ? "" : $"/{request.Command}");
+            await modelStorage.Save(userId, model);
+        }
 
         await historyLog(historyLogger, userId, response);
         return response;
