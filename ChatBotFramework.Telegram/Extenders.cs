@@ -57,6 +57,8 @@ static class TelegramExtenders
             _                      => throw new NotSupportedException($"{nameof(ConvertToDocument)} not support {m.GetType()}")
         };
 
+    public static GroupedFileInfo Convert(this FileBase f) => new(f.FileId, (int) (f.FileSize ?? 0));
+
     public static HandleMessageParams ConvertToParams(this Update u, params ChatBotRequestFile[] files) =>
         new(u.Id,
             $"{u.Message!.From!.GetUserName()}/{u.Type}",
@@ -66,6 +68,7 @@ static class TelegramExtenders
             u.Message.MessageId,
             files);
 
+    /// <summary> Without files (callback query can't contain files) </summary>
     public static HandleMessageParams ConvertToParams(this CallbackQuery c, Update u) =>
         new(u.Id,
             $"{c.Message!.From!.GetUserName()}/{u.Type}",
@@ -75,17 +78,17 @@ static class TelegramExtenders
             c.Message!.MessageId,
             Array.Empty<ChatBotRequestFile>());
 
-    public static async Task<ChatBotRequestFile?> TryDownloadFile(this ITelegramBotClient bot, ILogger logger, string fileId, string logContextPrefix)
+    public static async Task<ChatBotRequestFile?> TryDownloadFile(this ITelegramBotClient bot, ILogger logger, GroupedFileInfo file, string logContextPrefix)
     {
         using var stm = new MemoryStream();
         try
         {
-            var file = await bot.GetInfoAndDownloadFileAsync(fileId, stm);
-            return new ChatBotRequestFile(file.FilePath.FormatFileName(), stm.ToArray());
+            var fileInfo = await bot.GetInfoAndDownloadFileAsync(file.Id, stm);
+            return new ChatBotRequestFile(fileInfo.FilePath.FormatFileName(), stm.ToArray());
         }
         catch (Exception e)
         {
-            logger.LogWarning("[<{0}] Can't download file {1}: {2}", logContextPrefix, fileId, (e.InnerException ?? e).Message);
+            logger.LogWarning("[<{0}] Can't download file {1}: {2}", logContextPrefix, file, (e.InnerException ?? e).Message);
             return null;
         }
     }

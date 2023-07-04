@@ -4,6 +4,7 @@ using Telegram.Bot.Types;
 
 namespace ChatBotFramework.Telegram;
 
+/// <summary> singleton </summary>
 sealed class ChatBotMessageProcessor : IChatBotMessageProcessor
 {
     const int MEDIA_CHUNK_SIZE = 10;

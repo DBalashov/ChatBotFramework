@@ -123,3 +123,5 @@ Run and enter something in chat with bot
 * your can set `Modified` property of state model in Handle method and state model will be saved in storage automatically
 * bot state model must implement `IChatBotModel<STYPE>` interface and `STYPE` can be value or reference type
 * bot state model storage must implement `IChatBotModelStorage<UID,MODEL,STYPE>` interface and return new/empty model for new users
+
+* your may implement and register `IChatBotHistoryLogger<UID>` to log all user requests and responses

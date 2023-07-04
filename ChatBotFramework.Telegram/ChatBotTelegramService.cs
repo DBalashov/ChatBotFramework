@@ -11,21 +11,23 @@ namespace ChatBotFramework.Telegram;
 sealed class ChatBotTelegramService<MODEL, STYPE> : IHostedService, IUpdateHandler where MODEL : IChatBotModel<STYPE>
                                                                                    where STYPE : notnull
 {
+    const int FILE_SIZE_LIMIT = 20 * 1024 * 1024;
+
     readonly ILogger                  logger;
     readonly IChatBotMessageProcessor messageProcessor;
+    readonly IGroupedMessageService   groupedMessageService;
     readonly TelegramBotClient        bot;
     readonly string                   logPrefix;
-    readonly TimeSpan                 groupedMessageInterval;
 
-    readonly Dictionary<string, GroupedMessage> groupedMessages     = new(StringComparer.Ordinal);
-    readonly ReaderWriterLockSlim               groupedMessagesLock = new();
-
-    public ChatBotTelegramService(ILogger<ChatBotTelegramService<MODEL, STYPE>> logger, ChatBotTelegramOptions options, IChatBotMessageProcessor messageProcessor)
+    public ChatBotTelegramService(ILogger<ChatBotTelegramService<MODEL, STYPE>> logger,
+                                  ChatBotTelegramOptions                        options,
+                                  IChatBotMessageProcessor                      messageProcessor,
+                                  IGroupedMessageService                        groupedMessageService)
     {
-        this.logger            = logger;
-        this.messageProcessor  = messageProcessor;
-        bot                    = new TelegramBotClient(options.Token);
-        groupedMessageInterval = options.GroupedMessageInterval;
+        this.logger                = logger;
+        this.messageProcessor      = messageProcessor;
+        this.groupedMessageService = groupedMessageService;
+        bot                        = new TelegramBotClient(options.Token);
 
         var idx = options.Token.IndexOf(':');
         logPrefix = idx > 0 ? options.Token[..idx] : options.Token[..Math.Min(12, options.Token.Length)] + "xxx";
@@ -69,12 +71,28 @@ sealed class ChatBotTelegramService<MODEL, STYPE> : IHostedService, IUpdateHandl
                 return;
 
             case UpdateType.Message when u is {Type: UpdateType.Message, Message: {Type: MessageType.Photo, From: not null, Photo: not null}}:
-                var fileId = u.Message.Photo.OrderByDescending(p => p.FileSize ?? 0).First().FileId;
-                await processOrAddToGroup(u.Message.MediaGroupId, u, fileId, logContextPrefix);
+                var file = u.Message.Photo.Where(p => p.FileSize is <= FILE_SIZE_LIMIT).MaxBy(p => p.FileSize ?? 0); // file size for bots limited to 20 MB
+                if (file != null)
+                    await groupedMessageService.ProcessOrAddToGroup(bot, u.Message.MediaGroupId, u, file.Convert(), logContextPrefix);
+                else
+                {
+                    logger.LogWarning("[{0}] Photo not found or file size not specified or oversized ({1} bytes max file size)", logContextPrefix, FILE_SIZE_LIMIT);
+                    messageProcessor.HandleMessageAsync(bot, u.ConvertToParams());
+                }
+
                 return;
 
             case UpdateType.Message when u is {Type: UpdateType.Message, Message: {Type: MessageType.Document, From: not null, Document: not null}}:
-                await processOrAddToGroup(u.Message.MediaGroupId, u, u.Message.Document.FileId, logContextPrefix);
+                if (u.Message.Document.FileSize is <= FILE_SIZE_LIMIT) // file size for bots limited to 20 MB
+                {
+                    await groupedMessageService.ProcessOrAddToGroup(bot, u.Message.MediaGroupId, u, u.Message.Document.Convert(), logContextPrefix);
+                }
+                else
+                {
+                    logger.LogWarning("[{0}] Document file size not specified or oversized ({1} bytes max file size)", logContextPrefix, FILE_SIZE_LIMIT);
+                    messageProcessor.HandleMessageAsync(bot, u.ConvertToParams());
+                }
+
                 return;
         }
 
@@ -83,56 +101,12 @@ sealed class ChatBotTelegramService<MODEL, STYPE> : IHostedService, IUpdateHandl
 
     public async Task HandlePollingErrorAsync(ITelegramBotClient botClient, Exception exception, CancellationToken cancellationToken)
     {
-        logger.LogError((exception.InnerException ?? exception).Message);
-        logger.LogWarning("Restart polling after 5 seconds...");
+        logger.LogError("[{0}] Error while polling: {1}", logPrefix, exception.Message);
+        logger.LogDebug("[{0}] Error while polling: {1}", logPrefix, exception.StackTrace);
+        logger.LogWarning("[{0}] Restart polling after 5 seconds...", logPrefix);
         await Task.Delay(5000, cancellationToken);
         StartAsync(cancellationToken); // restart polling, intent without awaiting
     }
 
     #endregion
-
-    async Task processOrAddToGroup(string? mediaGroupId, Update u, string fileId, string logContextPrefix)
-    {
-        if (string.IsNullOrEmpty(mediaGroupId))
-        {
-            logger.LogDebug("[{0}] media group empty, handle immediately", logContextPrefix);
-            var file = await bot.TryDownloadFile(logger, fileId, logContextPrefix);
-            messageProcessor.HandleMessageAsync(bot, u.ConvertToParams(file != null ? new[] {file} : Array.Empty<ChatBotRequestFile>()));
-            return;
-        }
-
-        groupedMessagesLock.EnterUpgradeableReadLock();
-        if (!groupedMessages.TryGetValue(mediaGroupId, out var groupedMessage))
-        {
-            groupedMessagesLock.EnterWriteLock();
-            if (!groupedMessages.TryGetValue(mediaGroupId, out groupedMessage))
-            {
-                logger.LogDebug("[{0}] media group not found, create one {1}", logContextPrefix, mediaGroupId);
-                groupedMessages.Add(mediaGroupId, groupedMessage = new GroupedMessage(mediaGroupId, groupedMessageInterval, u.ConvertToParams(), logContextPrefix, completeMediaGroup));
-            }
-
-            groupedMessagesLock.ExitWriteLock();
-        }
-        else
-        {
-            logger.LogDebug("[{0}] media group found {1}", logContextPrefix, mediaGroupId);
-        }
-
-        groupedMessagesLock.ExitUpgradeableReadLock();
-        logger.LogDebug("[<{0}] media group {1}, add file {2}", logContextPrefix, mediaGroupId, fileId);
-        groupedMessage.AddFile(fileId);
-    }
-
-    async Task completeMediaGroup(GroupedMessage owner, HandleMessageParams p, string[] fileIDs, string logContextPrefix)
-    {
-        groupedMessagesLock.EnterWriteLock();
-        var existing = groupedMessages.Remove(owner.MediaGroupId);
-        logger.LogDebug("[{0}] media group {1} remove ({2})", logContextPrefix, owner.MediaGroupId, existing);
-        groupedMessagesLock.ExitWriteLock();
-
-        logger.LogDebug("[{0}] media group {1} complete, {2} files", logContextPrefix, owner.MediaGroupId, fileIDs.Length);
-
-        var files = (await Task.WhenAll(fileIDs.Select(fileId => bot.TryDownloadFile(logger, fileId, logContextPrefix)).ToArray())).Where(p => p != null).ToArray();
-        messageProcessor.HandleMessageAsync(bot, p with {Files = files!});
-    }
 }
