@@ -1,7 +1,7 @@
 ﻿namespace ChatBotFramework;
 
 /// <summary> scoped service </summary>
-sealed class ChatBotHandler<UID, MODEL, STYPE> : IChatBotHandler<UID> where MODEL : IChatBotModel<STYPE>, new()
+sealed class ChatBotHandler<UID, MODEL, STYPE> : IChatBotHandler<UID> where MODEL : class, IChatBotModel<STYPE>, new()
                                                                       where UID : notnull
                                                                       where STYPE : notnull
 {
@@ -35,7 +35,7 @@ sealed class ChatBotHandler<UID, MODEL, STYPE> : IChatBotHandler<UID> where MODE
         var handler = (request.Command != null
                            ? commandCollection.GetCommandHandler(serviceProvider, request.Command)
                            : commandCollection.GetStateHandler(serviceProvider, model.State)) ?? commandCollection.GetCommandHandler(serviceProvider, "*");
-        
+
         if (handler == null)
         {
             logger.LogWarning("[{0}] Can't find handler for command={1} or state={2}", userId, request.Command, model.State);

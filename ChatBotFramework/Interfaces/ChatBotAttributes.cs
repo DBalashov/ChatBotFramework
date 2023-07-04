@@ -1,7 +1,7 @@
 ﻿namespace ChatBotFramework;
 
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true)]
-public sealed class ChatBotStateAttribute<STYPE> : Attribute
+public sealed class ChatBotStateAttribute<STYPE> : Attribute where STYPE : notnull
 {
     public STYPE State { get; }
 

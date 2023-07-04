@@ -1,4 +1,5 @@
-﻿using Telegram.Bot;
+﻿using System.Diagnostics;
+using Telegram.Bot;
 using Telegram.Bot.Types;
 
 namespace ChatBotFramework.Telegram;
@@ -13,6 +14,7 @@ interface IGroupedMessageService
     Task ProcessOrAddToGroup(ITelegramBotClient bot, string? mediaGroupId, Update u, GroupedFileInfo file, string logContextPrefix);
 }
 
+[DebuggerDisplay("{Id}: {Size} bytes")]
 sealed record GroupedFileInfo(string Id, int Size)
 {
     public override string ToString() => $"{Id} ({Size} bytes)";

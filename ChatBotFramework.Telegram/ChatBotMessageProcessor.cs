@@ -120,13 +120,13 @@ sealed class ChatBotMessageProcessor : IChatBotMessageProcessor
                 try
                 {
                     var messagesOut = await bot.SendMediaGroupAsync(p.Chat, chunk, replyToMessageId: replyToMessageId);
-                    messageIDs.AddRange(messagesOut.Select(p => p.MessageId));
+                    messageIDs.AddRange(messagesOut.Select(m => m.MessageId));
                 }
                 catch (ApiRequestException e) when (e.ReplyMessageDeleted())
                 {
                     replyToMessageId = null;
                     var messagesOut = await bot.SendMediaGroupAsync(p.Chat, chunk);
-                    messageIDs.AddRange(messagesOut.Select(p => p.MessageId));
+                    messageIDs.AddRange(messagesOut.Select(m => m.MessageId));
                 }
         }
 

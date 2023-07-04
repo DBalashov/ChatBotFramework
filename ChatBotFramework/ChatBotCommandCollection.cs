@@ -1,7 +1,8 @@
 ﻿namespace ChatBotFramework;
 
-
-sealed class ChatBotCommandCollection<UID, MODEL, STYPE> : IChatBotCommandCollection<UID, MODEL, STYPE> where STYPE : notnull
+sealed class ChatBotCommandCollection<UID, MODEL, STYPE> : IChatBotCommandCollection<UID, MODEL, STYPE> where MODEL : class,IChatBotModel<STYPE>, new()
+                                                                                                        where STYPE : notnull
+                                                                                                        where UID : notnull
 {
     readonly Dictionary<string, Type> commands = new(StringComparer.OrdinalIgnoreCase);
     readonly Dictionary<STYPE, Type>  states   = new();

@@ -5,7 +5,7 @@ namespace ChatBotFramework;
 public static class Register
 {
     public static IServiceCollection AddChatBot<UID, MODEL, STYPE, PERSISTER>(this IServiceCollection s)
-        where MODEL : IChatBotModel<STYPE>, new()
+        where MODEL : class, IChatBotModel<STYPE>, new()
         where PERSISTER : class, IChatBotModelStorage<UID, MODEL, STYPE>
         where UID : notnull
         where STYPE : notnull
@@ -18,7 +18,7 @@ public static class Register
 
     public static IServiceCollection AddChatBotCommand<UID, MODEL, STYPE, HANDLER>(this IServiceCollection s, Func<IServiceProvider, HANDLER>? factory = null)
         where HANDLER : class, IChatBotCommand<UID, MODEL>
-        where MODEL : IChatBotModel<STYPE>, new()
+        where MODEL : class, IChatBotModel<STYPE>, new()
         where UID : notnull
         where STYPE : notnull
     {
@@ -39,7 +39,7 @@ public static class Register
         {
             if (factory != null) s.AddScoped(factory);
             else s.AddScoped<HANDLER>();
-            
+
             s.AddSingleton(new ChatBotStateWrapper<UID, MODEL, STYPE>(attState.State, typeof(HANDLER)));
             count++;
         }
@@ -49,7 +49,7 @@ public static class Register
         {
             if (factory != null) s.AddScoped(factory);
             else s.AddScoped<HANDLER>();
-            
+
             s.AddSingleton(new ChatBotCommandWrapper<UID, MODEL>("*", typeof(HANDLER)));
             count++;
         }

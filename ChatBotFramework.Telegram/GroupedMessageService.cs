@@ -10,6 +10,7 @@ using Telegram.Bot.Types;
 namespace ChatBotFramework.Telegram;
 
 /// <summary> singleton </summary>
+[DebuggerDisplay("MediaGroups: {mediaGroups.Count}")]
 sealed class GroupedMessageService : IGroupedMessageService
 {
     readonly ILogger                  logger;

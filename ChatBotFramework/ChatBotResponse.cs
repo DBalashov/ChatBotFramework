@@ -1,26 +1,35 @@
-﻿namespace ChatBotFramework;
+﻿using System.Diagnostics;
+
+namespace ChatBotFramework;
 
 public abstract record ChatBotMessageBase(params ChatBotButton[] Buttons);
 
+[DebuggerDisplay("{Command}: {Text}, Arguments: {Arguments}")]
 public sealed record ChatBotButton(string Text, string Command, string? Arguments = null);
 
+[DebuggerDisplay("Message: {Message}, Buttons: {Buttons.Length}")]
 public sealed record ChatBotMessage(string Message, params ChatBotButton[] Buttons) : ChatBotMessageBase(Buttons)
 {
     public bool Html { get; internal set; }
 }
 
+[DebuggerDisplay("File: {FileName}")]
 public sealed record ChatBotFile(Stream Stream, string? FileName = null) : ChatBotMessageBase();
 
-public sealed record ChatBotFileUrl(string Url) : ChatBotMessageBase();
+[DebuggerDisplay("FileUrl: {Url}")]
+public sealed record ChatBotFileUrl(string Url) : ChatBotMessageBase;
 
 public sealed record ChatBotImage(Stream Stream) : ChatBotMessageBase();
 
+[DebuggerDisplay("ImageUrl: {Url}")]
 public sealed record ChatBotImageUrl(string Url) : ChatBotMessageBase();
 
 public sealed record ChatBotVideo(Stream Stream) : ChatBotMessageBase();
 
+[DebuggerDisplay("VideoUrl: {Url}")]
 public sealed record ChatBotVideoUrl(string Url) : ChatBotMessageBase();
 
+[DebuggerDisplay("Messages: {Messages.Count}")]
 public sealed class ChatBotResponse
 {
     public List<ChatBotMessageBase> Messages { get; } = new();
